@@ -14,14 +14,14 @@ const auctionReducer = (state, action) => {
         loading: false,
       }
     case 'UPDATE_TIMER':
+      // Ensure auctionState exists before spreading
       return {
         ...state,
-        auctionState: {
-          ...state.auctionState,
-          time_left: action.payload,
-        },
+        auctionState: state.auctionState
+          ? { ...state.auctionState, time_left: action.payload }
+          : { time_left: action.payload }
       }
-    case 'NEW_BID':
+    case 'BID_UPDATE':
       return {
         ...state,
         auctionState: action.payload,
@@ -163,7 +163,7 @@ export const AuctionProvider = ({ children }) => {
   const handleNewBid = (data) => {
     console.log('💰 New bid received:', data)
     dispatch({
-      type: 'NEW_BID',
+      type: 'BID_UPDATE',
       payload: data.auctionState,
       teamName: data.teamName
     })

@@ -18,7 +18,7 @@ import { formatCurrency, getPositionColor, getTimerClass } from '../utils/helper
 
 const TeamDashboard = () => {
   const { user } = useAuth()
-  const { auctionState, placeBid, error, clearError } = useAuction()
+  const { auctionState, placeBid, error, clearError, lastSale } = useAuction()
   const [teamInfo, setTeamInfo] = useState(null)
   const [bidAmount, setBidAmount] = useState('')
   const [loading, setLoading] = useState(true)
@@ -27,6 +27,21 @@ const TeamDashboard = () => {
   useEffect(() => {
     fetchTeamInfo()
   }, [])
+
+  // Refetch team info when this team wins a player so the squad updates automatically
+  useEffect(() => {
+    if (!lastSale) return
+    try {
+      const soldTeamId = lastSale.teamId || lastSale.team_id || null
+      if (soldTeamId && user && soldTeamId === user.id) {
+        // Small timeout to allow backend DB updates to settle
+        const t = setTimeout(() => fetchTeamInfo(), 300)
+        return () => clearTimeout(t)
+      }
+    } catch (err) {
+      // ignore
+    }
+  }, [lastSale, user])
 
   useEffect(() => {
     if (error) {

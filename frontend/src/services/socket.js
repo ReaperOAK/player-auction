@@ -10,6 +10,8 @@ class SocketService {
     this.reconnectAttempts = 0
     this.maxReconnectAttempts = 5
     this.reconnectDelay = 1000
+  // pending listeners registered before socket exists
+  this._pendingListeners = new Map()
   }
 
   connect(user = null) {
@@ -39,6 +41,13 @@ class SocketService {
       } else {
         // Default to viewer
         this.socket.emit('join_room', { role: 'viewer' })
+      }
+
+      // Attach any pending listeners
+      for (const [event, callbacks] of this._pendingListeners.entries()) {
+        for (const cb of callbacks) {
+          try { this.socket.on(event, cb) } catch (err) { console.error('attach pending listener err', err) }
+        }
       }
     })
 
@@ -74,17 +83,30 @@ class SocketService {
       this.socket = null
       this.isConnected = false
     }
+  // keep pending listeners so they re-attach on next connect
   }
 
   on(event, callback) {
     if (this.socket) {
       this.socket.on(event, callback)
+    } else {
+      if (!this._pendingListeners.has(event)) this._pendingListeners.set(event, new Set())
+      this._pendingListeners.get(event).add(callback)
     }
   }
 
   off(event, callback) {
     if (this.socket) {
       this.socket.off(event, callback)
+    }
+
+    if (this._pendingListeners.has(event)) {
+      if (callback) {
+        this._pendingListeners.get(event).delete(callback)
+        if (this._pendingListeners.get(event).size === 0) this._pendingListeners.delete(event)
+      } else {
+        this._pendingListeners.delete(event)
+      }
     }
   }
 

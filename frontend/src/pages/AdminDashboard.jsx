@@ -29,9 +29,10 @@ const AdminDashboard = () => {
     pauseAuction, 
     resumeAuction, 
     endAuction,
-    loading: auctionLoading,
-    error,
-    clearError 
+  loading: auctionLoading,
+  error,
+  clearError,
+  lastSale
   } = useAuction()
 
   const [players, setPlayers] = useState([])
@@ -58,6 +59,14 @@ const AdminDashboard = () => {
       clearError()
     }
   }, [error, clearError])
+
+  // Refresh admin data when any player is sold/unsold so stats reflect latest DB state
+  useEffect(() => {
+    if (!lastSale) return
+    // allow DB updates to settle briefly
+    const t = setTimeout(() => fetchData(), 300)
+    return () => clearTimeout(t)
+  }, [lastSale])
 
   const fetchData = async () => {
     try {
