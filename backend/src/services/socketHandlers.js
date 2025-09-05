@@ -1,8 +1,124 @@
 const supabase = require('../config/database');
 
 let auctionTimer = null;
+let ioInstance = null; // Store io instance for external access
+
+// Helper to start the server-side timer (shared by start and resume)
+const startServerTimer = async (duration, io = ioInstance) => {
+  if (auctionTimer) {
+    clearInterval(auctionTimer);
+  }
+
+  let timeLeft = duration ?? 30;
+
+  // Mark auction as in_progress in DB (best-effort)
+  try {
+    await supabase
+      .from('auction_state')
+      .update({ status: 'in_progress', time_left: timeLeft })
+      .eq('id', 1);
+  } catch (err) {
+    console.error('Failed to update auction state when starting timer:', err);
+  }
+
+  // Immediately broadcast initial timer value
+  io?.emit('timer_update', { timeLeft });
+
+  auctionTimer = setInterval(async () => {
+    timeLeft--;
+
+    try {
+      // Update time in database
+      await supabase
+        .from('auction_state')
+        .update({ time_left: timeLeft })
+        .eq('id', 1);
+
+      // Broadcast time update
+      io?.emit('timer_update', { timeLeft });
+    } catch (err) {
+      console.error('Error updating timer in DB:', err);
+    }
+
+    // If time reaches 0, end auction
+    if (timeLeft <= 0) {
+      clearInterval(auctionTimer);
+      auctionTimer = null;
+
+      // Auto-end auction logic
+      try {
+        const { data: currentState } = await supabase
+          .from('auction_state')
+          .select('*')
+          .eq('id', 1)
+          .single();
+
+        if (currentState && currentState.current_bidder) {
+          // Assign player to highest bidder
+          await supabase
+            .from('players')
+            .update({
+              sold_to: currentState.current_bidder,
+              sold_price: currentState.current_bid
+            })
+            .eq('id', currentState.current_player_id);
+
+          // Update team budget and slots
+          const { data: team } = await supabase
+            .from('teams')
+            .select('budget, slots_left')
+            .eq('id', currentState.current_bidder)
+            .single();
+
+          await supabase
+            .from('teams')
+            .update({
+              budget: team.budget - currentState.current_bid,
+              slots_left: team.slots_left - 1
+            })
+            .eq('id', currentState.current_bidder);
+
+          // Get team name for broadcast
+          const { data: teamData } = await supabase
+            .from('teams')
+            .select('name')
+            .eq('id', currentState.current_bidder)
+            .single();
+
+          io?.emit('player_sold', {
+            playerId: currentState.current_player_id,
+            teamId: currentState.current_bidder,
+            teamName: teamData?.name,
+            soldPrice: currentState.current_bid
+          });
+        } else {
+          io?.emit('player_unsold', {
+            playerId: currentState.current_player_id
+          });
+        }
+
+        // Reset auction state
+        await supabase
+          .from('auction_state')
+          .update({
+            current_player_id: null,
+            status: 'not_started',
+            time_left: 30,
+            current_bid: 0,
+            current_bidder: null
+          })
+          .eq('id', 1);
+
+        io?.emit('auction_auto_ended');
+      } catch (error) {
+        console.error('Auto-end auction error:', error);
+      }
+    }
+  }, 1000);
+};
 
 const socketHandlers = (io) => {
+  ioInstance = io; // Store for external access
   io.on('connection', (socket) => {
     console.log(`🔌 Client connected: ${socket.id}`);
 
@@ -57,130 +173,58 @@ const socketHandlers = (io) => {
     // Handle auction timer events
     socket.on('start_timer', async (data) => {
       const { duration = 30 } = data;
-      
-      if (auctionTimer) {
-        clearInterval(auctionTimer);
-      }
-
-      let timeLeft = duration;
-      
-      auctionTimer = setInterval(async () => {
-        timeLeft--;
-        
-        // Update time in database
-        await supabase
-          .from('auction_state')
-          .update({ time_left: timeLeft })
-          .eq('id', 1);
-
-        // Broadcast time update
-        io.emit('timer_update', { timeLeft });
-
-        // If time reaches 0, end auction
-        if (timeLeft <= 0) {
-          clearInterval(auctionTimer);
-          auctionTimer = null;
-          
-          // Auto-end auction
-          try {
-            const { data: currentState } = await supabase
-              .from('auction_state')
-              .select('*')
-              .eq('id', 1)
-              .single();
-
-            if (currentState && currentState.current_bidder) {
-              // Assign player to highest bidder
-              await supabase
-                .from('players')
-                .update({
-                  sold_to: currentState.current_bidder,
-                  sold_price: currentState.current_bid
-                })
-                .eq('id', currentState.current_player_id);
-
-              // Update team budget and slots
-              const { data: team } = await supabase
-                .from('teams')
-                .select('budget, slots_left')
-                .eq('id', currentState.current_bidder)
-                .single();
-
-              await supabase
-                .from('teams')
-                .update({
-                  budget: team.budget - currentState.current_bid,
-                  slots_left: team.slots_left - 1
-                })
-                .eq('id', currentState.current_bidder);
-
-              // Get team name for broadcast
-              const { data: teamData } = await supabase
-                .from('teams')
-                .select('name')
-                .eq('id', currentState.current_bidder)
-                .single();
-
-              io.emit('player_sold', {
-                playerId: currentState.current_player_id,
-                teamId: currentState.current_bidder,
-                teamName: teamData?.name,
-                soldPrice: currentState.current_bid
-              });
-            } else {
-              io.emit('player_unsold', {
-                playerId: currentState.current_player_id
-              });
-            }
-
-            // Reset auction state
-            await supabase
-              .from('auction_state')
-              .update({
-                current_player_id: null,
-                status: 'not_started',
-                time_left: 30,
-                current_bid: 0,
-                current_bidder: null
-              })
-              .eq('id', 1);
-
-            io.emit('auction_auto_ended');
-            
-          } catch (error) {
-            console.error('Auto-end auction error:', error);
-          }
-        }
-      }, 1000);
+      startServerTimer(duration, io);
     });
 
-    socket.on('pause_timer', () => {
+    socket.on('pause_timer', async () => {
       if (auctionTimer) {
         clearInterval(auctionTimer);
         auctionTimer = null;
-        io.emit('timer_paused');
+
+        // Mark auction as paused in DB (best-effort) and notify clients
+        try {
+          const { data: pausedState } = await supabase
+            .from('auction_state')
+            .update({ status: 'paused' })
+            .eq('id', 1)
+            .select()
+            .single();
+
+          io.emit('timer_paused');
+          io.emit('auction_paused', { auctionState: pausedState });
+          io.emit('auction_state_update', { auctionState: pausedState });
+        } catch (err) {
+          console.error('Error pausing timer and updating DB:', err);
+          io.emit('timer_paused');
+        }
       }
     });
 
     socket.on('resume_timer', async () => {
       if (!auctionTimer) {
-        const { data: currentState } = await supabase
-          .from('auction_state')
-          .select('time_left')
-          .eq('id', 1)
-          .single();
+        try {
+          const { data: currentState } = await supabase
+            .from('auction_state')
+            .select('time_left')
+            .eq('id', 1)
+            .single();
 
-        if (currentState && currentState.time_left > 0) {
-          socket.emit('start_timer', { duration: currentState.time_left });
+          if (currentState && currentState.time_left > 0) {
+            // Start timer on server-side
+            startServerTimer(currentState.time_left, io);
+
+            // Notify clients that auction has resumed
+            io.emit('auction_resumed', { auctionState: currentState });
+            io.emit('auction_state_update', { auctionState: currentState });
+          }
+        } catch (err) {
+          console.error('Error resuming timer:', err);
         }
       }
     });
 
-    // Handle real-time bid updates - broadcast to all rooms
-    socket.on('bid_placed', (data) => {
-      // Broadcast to all connected clients
-      io.emit('bid_update', data);
-    });
+  // NOTE: clients should place bids via REST API `/api/auction/bid`.
+  // The backend route will validate, update DB, and emit `bid_update` and `auction_state_update`.
 
     // Handle admin controls - broadcast to teams and viewers
     socket.on('admin_action', (data) => {
@@ -210,4 +254,8 @@ const socketHandlers = (io) => {
   });
 };
 
-module.exports = socketHandlers;
+// Export the timer function for use in REST routes
+module.exports = { 
+  default: socketHandlers,
+  startAuctionTimer: startServerTimer
+};

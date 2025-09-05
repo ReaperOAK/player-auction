@@ -1,6 +1,7 @@
 const express = require('express');
 const supabase = require('../config/database');
 const { authenticateAdmin, authenticateTeam, authenticateToken } = require('../middleware/auth');
+const { startAuctionTimer } = require('../services/socketHandlers');
 
 const router = express.Router();
 
@@ -120,6 +121,9 @@ router.post('/start/:playerId', authenticateAdmin, async (req, res) => {
     req.io?.emit('auction_state_update', {
       auctionState
     });
+
+    // Start the server-side timer
+    startAuctionTimer(timerDuration, req.io);
 
     res.json({
       success: true,
@@ -378,6 +382,9 @@ router.post('/bid', authenticateTeam, async (req, res) => {
     req.io?.emit('auction_state_update', {
       auctionState: updatedState
     });
+
+    // Restart the timer with 30 seconds after a bid
+    startAuctionTimer(30, req.io);
 
     res.json({
       success: true,

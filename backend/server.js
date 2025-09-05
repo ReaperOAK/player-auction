@@ -11,7 +11,7 @@ const teamRoutes = require('./src/routes/teams');
 const auctionRoutes = require('./src/routes/auction');
 
 // Import socket handlers
-const socketHandlers = require('./src/services/socketHandlers');
+const { default: socketHandlers } = require('./src/services/socketHandlers');
 
 dotenv.config();
 

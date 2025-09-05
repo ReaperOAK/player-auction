@@ -1,4 +1,5 @@
 import { io } from 'socket.io-client'
+import { auctionApi } from './api'
 
 const SOCKET_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
 
@@ -88,8 +89,13 @@ class SocketService {
   }
 
   emit(event, data) {
-    if (this.socket && this.isConnected) {
-      this.socket.emit(event, data)
+    // Allow emitting even if `isConnected` not yet true; socket.io will queue emits until connected
+    if (this.socket) {
+      try {
+        this.socket.emit(event, data)
+      } catch (err) {
+        console.error('Socket emit error:', err)
+      }
     }
   }
 
@@ -123,7 +129,10 @@ class SocketService {
   }
 
   placeBid(bidData) {
-    this.emit('bid_placed', bidData)
+  // Use REST endpoint for placing bids to ensure server-side validation and single source of truth
+  // bidData may be a number or object; auctionApi.placeBid expects bidAmount
+  const amount = typeof bidData === 'object' ? bidData.bidAmount || bidData.amount : bidData
+  return auctionApi.placeBid(amount)
   }
 
   adminAction(action) {
