@@ -19,16 +19,32 @@ const app = express();
 const server = http.createServer(app);
 const io = socketIo(server, {
   cors: {
-    origin: process.env.CORS_ORIGIN || "http://localhost:3000",
-    methods: ["GET", "POST"]
+    origin: (origin, callback) => {
+      const raw = process.env.CORS_ORIGINS || process.env.CORS_ORIGIN || "http://localhost:3000";
+      const allowed = raw.split(',').map(s => s.trim()).filter(Boolean);
+      // Allow non-browser requests (e.g., socket clients without origin)
+      if (!origin) return callback(null, true);
+      if (allowed.includes(origin)) return callback(null, true);
+      return callback(new Error('CORS origin not allowed'));
+    },
+    methods: ["GET", "POST"],
+    credentials: true
   }
 });
 
 const PORT = process.env.PORT || 5000;
 
 // Middleware
+// Support multiple origins via CORS_ORIGINS env var (comma-separated)
+const corsOriginsRaw = process.env.CORS_ORIGINS || process.env.CORS_ORIGIN || "http://localhost:3000";
+const corsWhitelist = corsOriginsRaw.split(',').map(s => s.trim()).filter(Boolean);
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || "http://localhost:3000",
+  origin: (origin, callback) => {
+    // Allow requests with no origin (e.g., server-to-server, curl)
+    if (!origin) return callback(null, true);
+    if (corsWhitelist.includes(origin)) return callback(null, true);
+    return callback(new Error('CORS origin not allowed'));
+  },
   credentials: true
 }));
 app.use(express.json());
