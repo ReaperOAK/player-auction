@@ -17,8 +17,5 @@
       "src": "/(.*)",
       "dest": "/index.html"
     }
-  ],
-  "env": {
-    "VITE_API_URL": "https://player-auction-backend.onrender.com"
-  }
+  ]
 }
