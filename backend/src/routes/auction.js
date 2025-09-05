@@ -1,7 +1,7 @@
 const express = require('express');
 const supabase = require('../config/database');
 const { authenticateAdmin, authenticateTeam, authenticateToken } = require('../middleware/auth');
-const { startAuctionTimer } = require('../services/socketHandlers');
+const { startAuctionTimer, stopAuctionTimer } = require('../services/socketHandlers');
 
 const router = express.Router();
 
@@ -112,17 +112,20 @@ router.post('/start/:playerId', authenticateAdmin, async (req, res) => {
     }
 
     // Emit socket event for auction start
+    console.log('🚀 Emitting auction_started event to all clients');
     req.io?.emit('auction_started', {
       auctionState,
       player
     });
 
     // Also emit general state update for all connected clients
+    console.log('🔄 Emitting auction_state_update event to all clients');
     req.io?.emit('auction_state_update', {
       auctionState
     });
 
     // Start the server-side timer
+    console.log('⏰ Starting auction timer with duration:', timerDuration);
     startAuctionTimer(timerDuration, req.io);
 
     res.json({
@@ -150,6 +153,11 @@ router.post('/pause', authenticateAdmin, async (req, res) => {
       throw error;
     }
 
+    // Stop the timer
+    console.log('⏸️ Stopping auction timer for pause');
+    stopAuctionTimer();
+
+    console.log('⏸️ Emitting auction_paused event to all clients');
     req.io?.emit('auction_paused', { auctionState });
     req.io?.emit('auction_state_update', { auctionState });
 
@@ -178,6 +186,13 @@ router.post('/resume', authenticateAdmin, async (req, res) => {
       throw error;
     }
 
+    // Restart the timer with remaining time
+    if (auctionState.time_left > 0) {
+      console.log('▶️ Restarting auction timer with remaining time:', auctionState.time_left);
+      startAuctionTimer(auctionState.time_left, req.io);
+    }
+
+    console.log('▶️ Emitting auction_resumed event to all clients');
     req.io?.emit('auction_resumed', { auctionState });
     req.io?.emit('auction_state_update', { auctionState });
 
@@ -267,11 +282,44 @@ router.post('/end', authenticateAdmin, async (req, res) => {
       throw resetError;
     }
 
+    // Stop the server-side timer
+    console.log('🛑 Stopping auction timer');
+    stopAuctionTimer();
+
+    // Emit auction ended event
+    console.log('🏁 Emitting auction_ended event to all clients');
     req.io?.emit('auction_ended', { 
       auctionState,
       soldTo: currentState.current_bidder,
       soldPrice: currentState.current_bid
     });
+
+    // Also emit auction_state_update for all connected clients
+    console.log('🔄 Emitting auction_state_update event to all clients');
+    req.io?.emit('auction_state_update', {
+      auctionState
+    });
+
+    // If player was sold, emit player_sold event
+    if (currentState.current_bidder) {
+      // Get team name for the event
+      const { data: teamData } = await supabase
+        .from('teams')
+        .select('name')
+        .eq('id', currentState.current_bidder)
+        .single();
+
+      req.io?.emit('player_sold', {
+        playerId: currentState.current_player_id,
+        teamId: currentState.current_bidder,
+        teamName: teamData?.name,
+        soldPrice: currentState.current_bid
+      });
+    } else {
+      req.io?.emit('player_unsold', {
+        playerId: currentState.current_player_id
+      });
+    }
 
     res.json({
       success: true,

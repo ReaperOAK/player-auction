@@ -22,6 +22,7 @@ const startServerTimer = async (duration, io = ioInstance) => {
   }
 
   // Immediately broadcast initial timer value
+  console.log(`⏰ Starting timer with ${timeLeft} seconds, broadcasting initial timer_update`);
   io?.emit('timer_update', { timeLeft });
 
   auctionTimer = setInterval(async () => {
@@ -257,5 +258,12 @@ const socketHandlers = (io) => {
 // Export the timer function for use in REST routes
 module.exports = { 
   default: socketHandlers,
-  startAuctionTimer: startServerTimer
+  startAuctionTimer: startServerTimer,
+  stopAuctionTimer: () => {
+    if (auctionTimer) {
+      clearInterval(auctionTimer);
+      auctionTimer = null;
+      console.log('🛑 Auction timer stopped by external call');
+    }
+  }
 };
