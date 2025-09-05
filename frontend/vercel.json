@@ -19,6 +19,6 @@
     }
   ],
   "env": {
-    "VITE_API_URL": "@vite_api_url"
+    "VITE_API_URL": "https://player-auction-backend.onrender.com"
   }
 }
