@@ -68,6 +68,8 @@ export const AuthProvider = ({ children }) => {
         logout()
       }
     } else {
+      // Even without authentication, connect as viewer for real-time updates
+      socketService.connect(null)
       dispatch({ type: 'SET_LOADING', payload: false })
     }
   }, [])

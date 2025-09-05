@@ -84,10 +84,12 @@ export const AuctionProvider = ({ children }) => {
     socketService.on('auction_paused', handleAuctionPaused)
     socketService.on('auction_resumed', handleAuctionResumed)
     socketService.on('auction_ended', handleAuctionEnded)
-    socketService.on('new_bid', handleNewBid)
+    socketService.on('auction_state_update', handleAuctionStateUpdate)
+    socketService.on('bid_update', handleNewBid)
     socketService.on('timer_update', handleTimerUpdate)
     socketService.on('player_sold', handlePlayerSold)
     socketService.on('player_unsold', handlePlayerUnsold)
+    socketService.on('auction_auto_ended', handleAuctionEnded)
 
     return () => {
       // Cleanup socket listeners
@@ -95,10 +97,12 @@ export const AuctionProvider = ({ children }) => {
       socketService.off('auction_paused', handleAuctionPaused)
       socketService.off('auction_resumed', handleAuctionResumed)
       socketService.off('auction_ended', handleAuctionEnded)
-      socketService.off('new_bid', handleNewBid)
+      socketService.off('auction_state_update', handleAuctionStateUpdate)
+      socketService.off('bid_update', handleNewBid)
       socketService.off('timer_update', handleTimerUpdate)
       socketService.off('player_sold', handlePlayerSold)
       socketService.off('player_unsold', handlePlayerUnsold)
+      socketService.off('auction_auto_ended', handleAuctionEnded)
     }
   }, [])
 
@@ -148,7 +152,16 @@ export const AuctionProvider = ({ children }) => {
     })
   }
 
+  const handleAuctionStateUpdate = (data) => {
+    console.log('🔄 Auction state update received:', data)
+    dispatch({
+      type: 'SET_AUCTION_STATE',
+      payload: data.auctionState
+    })
+  }
+
   const handleNewBid = (data) => {
+    console.log('💰 New bid received:', data)
     dispatch({
       type: 'NEW_BID',
       payload: data.auctionState,
@@ -158,6 +171,7 @@ export const AuctionProvider = ({ children }) => {
   }
 
   const handleTimerUpdate = (data) => {
+    console.log('⏰ Timer update received:', data.timeLeft)
     dispatch({
       type: 'UPDATE_TIMER',
       payload: data.timeLeft

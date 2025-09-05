@@ -13,6 +13,7 @@ import ViewerDashboard from './pages/ViewerDashboard'
 // Component imports
 import ProtectedRoute from './components/ProtectedRoute'
 import Navbar from './components/Navbar'
+import SocketStatus from './components/SocketStatus'
 
 function App() {
   return (
@@ -72,6 +73,9 @@ function App() {
                 },
               }}
             />
+            
+            {/* Socket connection status indicator */}
+            <SocketStatus />
           </div>
         </Router>
       </AuctionProvider>

@@ -110,10 +110,15 @@ router.post('/start/:playerId', authenticateAdmin, async (req, res) => {
       throw updateError;
     }
 
-    // Emit socket event (will be handled by socket service)
+    // Emit socket event for auction start
     req.io?.emit('auction_started', {
       auctionState,
       player
+    });
+
+    // Also emit general state update for all connected clients
+    req.io?.emit('auction_state_update', {
+      auctionState
     });
 
     res.json({
@@ -142,6 +147,7 @@ router.post('/pause', authenticateAdmin, async (req, res) => {
     }
 
     req.io?.emit('auction_paused', { auctionState });
+    req.io?.emit('auction_state_update', { auctionState });
 
     res.json({
       success: true,
@@ -169,6 +175,7 @@ router.post('/resume', authenticateAdmin, async (req, res) => {
     }
 
     req.io?.emit('auction_resumed', { auctionState });
+    req.io?.emit('auction_state_update', { auctionState });
 
     res.json({
       success: true,
@@ -359,12 +366,17 @@ router.post('/bid', authenticateTeam, async (req, res) => {
       throw updateError;
     }
 
-    // Emit socket event
-    req.io?.emit('new_bid', {
+    // Emit socket event for real-time updates
+    req.io?.emit('bid_update', {
       auctionState: updatedState,
       bidAmount,
       teamId,
       teamName: req.user.name
+    });
+
+    // Also emit general state update
+    req.io?.emit('auction_state_update', {
+      auctionState: updatedState
     });
 
     res.json({

@@ -18,10 +18,41 @@ const socketHandlers = (io) => {
         socket.join(`team_${teamId}`);
         console.log(`🏆 Team ${teamId} joined: ${socket.id}`);
       } else {
+        // Handle both 'viewer' and undefined/null cases
         socket.join('viewers');
         console.log(`👁️ Viewer joined: ${socket.id}`);
       }
+
+      // Send current auction state to newly connected client
+      sendCurrentState(socket);
     });
+
+    // Function to send current auction state
+    const sendCurrentState = async (targetSocket) => {
+      try {
+        const { data: auctionState } = await supabase
+          .from('auction_state')
+          .select(`
+            *,
+            current_player:players(
+              id,
+              name,
+              year,
+              position,
+              base_price,
+              played_last_year
+            )
+          `)
+          .eq('id', 1)
+          .single();
+
+        if (auctionState) {
+          targetSocket.emit('auction_state_update', { auctionState });
+        }
+      } catch (error) {
+        console.error('Error sending current state:', error);
+      }
+    };
 
     // Handle auction timer events
     socket.on('start_timer', async (data) => {
@@ -145,14 +176,20 @@ const socketHandlers = (io) => {
       }
     });
 
-    // Handle real-time bid updates
+    // Handle real-time bid updates - broadcast to all rooms
     socket.on('bid_placed', (data) => {
-      socket.broadcast.emit('new_bid_notification', data);
+      // Broadcast to all connected clients
+      io.emit('bid_update', data);
     });
 
-    // Handle admin controls
+    // Handle admin controls - broadcast to teams and viewers
     socket.on('admin_action', (data) => {
-      socket.to('teams').to('viewers').emit('admin_update', data);
+      io.to('teams').to('viewers').emit('admin_update', data);
+    });
+
+    // Handle auction state changes - broadcast to all
+    socket.on('auction_state_changed', (data) => {
+      io.emit('auction_state_update', data);
     });
 
     // Handle chat messages (future feature)

@@ -6,20 +6,28 @@ class SocketService {
   constructor() {
     this.socket = null
     this.isConnected = false
+    this.reconnectAttempts = 0
+    this.maxReconnectAttempts = 5
+    this.reconnectDelay = 1000
   }
 
-  connect(user) {
+  connect(user = null) {
     if (this.socket) {
       this.disconnect()
     }
 
     this.socket = io(SOCKET_URL, {
       transports: ['websocket', 'polling'],
+      autoConnect: true,
+      reconnection: true,
+      reconnectionAttempts: this.maxReconnectAttempts,
+      reconnectionDelay: this.reconnectDelay,
     })
 
     this.socket.on('connect', () => {
       console.log('🔌 Connected to server')
       this.isConnected = true
+      this.reconnectAttempts = 0
       
       // Join appropriate room based on user role
       if (user) {
@@ -28,18 +36,32 @@ class SocketService {
           teamId: user.id
         })
       } else {
-        // Viewer
+        // Default to viewer
         this.socket.emit('join_room', { role: 'viewer' })
       }
     })
 
-    this.socket.on('disconnect', () => {
-      console.log('🔌 Disconnected from server')
+    this.socket.on('disconnect', (reason) => {
+      console.log('🔌 Disconnected from server:', reason)
       this.isConnected = false
     })
 
     this.socket.on('connect_error', (error) => {
       console.error('🔌 Connection error:', error)
+      this.reconnectAttempts++
+      
+      if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+        console.error('Max reconnection attempts reached')
+      }
+    })
+
+    this.socket.on('reconnect', (attemptNumber) => {
+      console.log(`🔌 Reconnected after ${attemptNumber} attempts`)
+      this.reconnectAttempts = 0
+    })
+
+    this.socket.on('reconnect_error', (error) => {
+      console.error('🔌 Reconnection error:', error)
     })
 
     return this.socket
@@ -68,6 +90,22 @@ class SocketService {
   emit(event, data) {
     if (this.socket && this.isConnected) {
       this.socket.emit(event, data)
+    }
+  }
+
+  // Utility methods
+  getConnectionStatus() {
+    return {
+      isConnected: this.isConnected,
+      socketId: this.socket?.id,
+      reconnectAttempts: this.reconnectAttempts
+    }
+  }
+
+  forceReconnect() {
+    if (this.socket) {
+      this.socket.disconnect()
+      this.socket.connect()
     }
   }
 
