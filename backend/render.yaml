@@ -1,0 +1,32 @@
+# Render configuration for Node.js backend
+name: player-auction-backend
+type: web
+env: node
+region: oregon
+plan: free
+buildCommand: npm install
+startCommand: npm start
+healthCheckPath: /health
+
+# Auto-deploy from main branch
+autoDeploy: true
+branch: main
+
+# Environment variables (set these in Render dashboard)
+envVars:
+  - key: NODE_ENV
+    value: production
+  - key: PORT
+    value: 10000
+  - key: SUPABASE_URL
+    sync: false  # Set manually in dashboard
+  - key: SUPABASE_ANON_KEY
+    sync: false  # Set manually in dashboard
+  - key: JWT_SECRET
+    generateValue: true  # Auto-generate secure value
+  - key: ADMIN_USERNAME
+    value: admin
+  - key: ADMIN_PASSWORD
+    sync: false  # Set manually in dashboard
+  - key: CORS_ORIGIN
+    sync: false  # Set to frontend URL
