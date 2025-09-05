@@ -197,7 +197,7 @@ player-auction/
 - `auction_paused` - Auction has been paused by admin
 - `auction_resumed` - Auction has been resumed by admin
 - `auction_ended` - Auction ended (timer expired or admin action)
-- `new_bid` - New bid placed by a team
+- `bid_update` - New bid placed by a team
 - `timer_update` - Real-time timer countdown updates
 - `player_sold` - Player sold to winning team
 - `player_unsold` - Player not sold (no bids or reserve not met)

@@ -75,7 +75,7 @@ npm run dev
 - `auction_paused` - Auction paused
 - `auction_resumed` - Auction resumed
 - `auction_ended` - Auction ended
-- `new_bid` - New bid placed
+- `bid_update` - New bid placed
 - `timer_update` - Timer countdown update
 - `player_sold` - Player sold to team
 - `player_unsold` - Player not sold
