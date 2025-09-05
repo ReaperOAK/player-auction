@@ -36,6 +36,8 @@ const AdminDashboard = () => {
   } = useAuction()
 
   const [players, setPlayers] = useState([])
+  // All players (unfiltered) used for analytics / quick stats
+  const [allPlayers, setAllPlayers] = useState([])
   const [teams, setTeams] = useState([])
   const [selectedPlayer, setSelectedPlayer] = useState(null)
   const [filterPosition, setFilterPosition] = useState('all')
@@ -71,11 +73,14 @@ const AdminDashboard = () => {
   const fetchData = async () => {
     try {
       setLoading(true)
-      const [playersRes, teamsRes] = await Promise.all([
+      // Fetch filtered players for the grid and all players for analytics
+      const [playersRes, allPlayersRes, teamsRes] = await Promise.all([
         playersApi.getAll({ position: filterPosition, sold: filterSold }),
+        playersApi.getAll(),
         teamsApi.getAll()
       ])
       setPlayers(playersRes.data.players)
+      setAllPlayers(allPlayersRes.data.players)
       setTeams(teamsRes.data.teams)
     } catch (err) {
       toast.error('Failed to fetch data')
@@ -408,23 +413,23 @@ const AdminDashboard = () => {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="card text-center">
           <Users className="mx-auto mb-2 text-blue-500" size={24} />
-          <div className="text-xl font-bold text-gray-900">{players.length}</div>
+            <div className="text-xl font-bold text-gray-900">{allPlayers.length}</div>
           <div className="text-sm text-gray-600">Total Players</div>
         </div>
         
         <div className="card text-center">
           <DollarSign className="mx-auto mb-2 text-green-500" size={24} />
           <div className="text-xl font-bold text-gray-900">
-            {players.filter(p => p.sold_to).length}
+              {allPlayers.filter(p => p.sold_to).length}
           </div>
           <div className="text-sm text-gray-600">Players Sold</div>
         </div>
         
         <div className="card text-center">
           <Clock className="mx-auto mb-2 text-yellow-500" size={24} />
-          <div className="text-xl font-bold text-gray-900">
-            {players.filter(p => !p.sold_to).length}
-          </div>
+            <div className="text-xl font-bold text-gray-900">
+              {allPlayers.filter(p => !p.sold_to).length}
+            </div>
           <div className="text-sm text-gray-600">Available</div>
         </div>
         
