@@ -64,7 +64,8 @@ app.use((err, req, res, next) => {
 });
 
 // 404 handler
-app.all('*', (req, res) => {
+// Use app.use without a path to avoid path-to-regexp parsing issues for wildcards
+app.use((req, res) => {
   res.status(404).json({ error: 'Route not found' });
 });
 
