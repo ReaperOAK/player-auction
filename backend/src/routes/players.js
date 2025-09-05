@@ -241,4 +241,76 @@ router.delete('/:id', authenticateAdmin, async (req, res) => {
   }
 });
 
+// Revert sold player and refund team (Admin only)
+router.post('/:id/revert', authenticateAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // fetch player to ensure it's sold
+    const { data: player, error: fetchErr } = await supabase
+      .from('players')
+      .select('id, sold_price, sold_to')
+      .eq('id', id)
+      .single();
+
+    if (fetchErr) throw fetchErr;
+
+    if (!player) return res.status(404).json({ error: 'Player not found' });
+
+    if (!player.sold_to || !player.sold_price) {
+      return res.status(400).json({ error: 'Player is not sold' });
+    }
+
+    const teamId = player.sold_to;
+    const refundAmount = player.sold_price || 0;
+
+  // Refund team: increment budget and slots_left
+    const { data: team, error: teamErr } = await supabase
+      .from('teams')
+      .select('id, budget, slots_left')
+      .eq('id', teamId)
+      .single();
+
+    if (teamErr) throw teamErr;
+
+    if (!team) return res.status(404).json({ error: 'Team not found' });
+
+    const newBudget = (team.budget || 0) + refundAmount;
+    const newSlots = (team.slots_left || 0) + 1;
+
+    const { error: updateTeamErr } = await supabase
+      .from('teams')
+      .update({ budget: newBudget, slots_left: newSlots })
+      .eq('id', teamId);
+
+    if (updateTeamErr) throw updateTeamErr;
+
+    // Update player to clear sold fields
+    const { data: updatedPlayer, error: updatePlayerErr } = await supabase
+      .from('players')
+      .update({ sold_price: null, sold_to: null })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (updatePlayerErr) throw updatePlayerErr;
+    // Emit realtime event so connected clients can refresh
+    try {
+      req.io?.emit('player_unsold', {
+        playerId: updatedPlayer.id,
+        refunded: refundAmount,
+        teamId,
+        revertedBy: 'admin'
+      })
+    } catch (emitErr) {
+      console.error('Error emitting player_unsold event:', emitErr)
+    }
+
+    res.json({ success: true, player: updatedPlayer, refunded: refundAmount, team: { id: teamId, budget: newBudget, slots_left: newSlots } });
+  } catch (error) {
+    console.error('Revert player error:', error);
+    res.status(500).json({ error: 'Failed to revert player' });
+  }
+});
+
 module.exports = router;

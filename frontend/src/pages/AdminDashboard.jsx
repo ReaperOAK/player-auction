@@ -149,6 +149,22 @@ const AdminDashboard = () => {
     }
   }
 
+  const handleRevertPlayer = async (playerId) => {
+    if (!confirm('Revert this player to available and refund the team?')) return
+
+    try {
+      const res = await playersApi.revert(playerId)
+      if (res.data?.success) {
+        toast.success('Player reverted and team refunded')
+        fetchData()
+      } else {
+        toast.error('Failed to revert player')
+      }
+    } catch (err) {
+      toast.error('Failed to revert player')
+    }
+  }
+
   const filteredPlayers = players.filter(player =>
     player.name.toLowerCase().includes(searchTerm.toLowerCase())
   )
@@ -365,6 +381,15 @@ const AdminDashboard = () => {
                 >
                   <Trash2 size={14} />
                 </button>
+                {player.sold_to && (
+                  <button
+                    onClick={() => handleRevertPlayer(player.id)}
+                    className="p-1 text-gray-400 hover:text-orange-600"
+                    title="Revert sale"
+                  >
+                    R
+                  </button>
+                )}
               </div>
             </div>
 

@@ -46,6 +46,7 @@ export const playersApi = {
   create: (data) => api.post('/players', data),
   update: (id, data) => api.put(`/players/${id}`, data),
   delete: (id) => api.delete(`/players/${id}`),
+  revert: (id) => api.post(`/players/${id}/revert`),
   uploadCSV: (formData) => api.post('/players/upload', formData, {
     headers: { 'Content-Type': 'multipart/form-data' }
   }),
