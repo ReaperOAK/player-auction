@@ -84,7 +84,7 @@ router.post('/team/login', async (req, res) => {
         .insert({
           id: team.id,
           name: team.name,
-          budget: 1000000, // 10 lakh initial budget
+          budget: 1000, // 10 lakh initial budget
           slots_left: 11 // 11 players per team
         });
 

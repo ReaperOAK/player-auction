@@ -34,7 +34,7 @@ router.get('/state', async (req, res) => {
         .insert({
           status: 'not_started',
           time_left: 30,
-          bid_increment: 10000,
+          bid_increment: 5,
           current_bid: 0
         })
         .select()
@@ -64,7 +64,7 @@ router.get('/state', async (req, res) => {
 router.post('/start/:playerId', authenticateAdmin, async (req, res) => {
   try {
     const { playerId } = req.params;
-    const { bidIncrement = 10000, timerDuration = 30 } = req.body;
+    const { bidIncrement = 5, timerDuration = 30 } = req.body;
 
     // Check if player exists and is not sold
     const { data: player, error: playerError } = await supabase

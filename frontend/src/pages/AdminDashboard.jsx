@@ -46,9 +46,12 @@ const AdminDashboard = () => {
   const [loading, setLoading] = useState(true)
   const [showAddPlayer, setShowAddPlayer] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
+  const [showEditPlayer, setShowEditPlayer] = useState(false)
+  const [editFormData, setEditFormData] = useState(null)
+  const [editLoading, setEditLoading] = useState(false)
   const [auctionSettings, setAuctionSettings] = useState({
     timerDuration: 30,
-    bidIncrement: 10000
+    bidIncrement: 5
   })
 
   useEffect(() => {
@@ -340,7 +343,18 @@ const AdminDashboard = () => {
               </div>
               <div className="flex items-center space-x-1">
                 <button
-                  onClick={() => {/* TODO: Edit player */}}
+                  onClick={() => {
+                    // Open edit modal with player data
+                    setEditFormData({
+                      id: player.id,
+                      name: player.name || '',
+                      year: player.year || new Date().getFullYear(),
+                      position: player.position || 'Midfield',
+                      base_price: player.base_price || 50000,
+                      played_last_year: !!player.played_last_year
+                    })
+                    setShowEditPlayer(true)
+                  }}
                   className="p-1 text-gray-400 hover:text-gray-600"
                 >
                   <Edit size={14} />
@@ -452,6 +466,14 @@ const AdminDashboard = () => {
         }}
       />
 
+      {/* Edit Player Modal */}
+      <EditPlayerModal
+        isOpen={showEditPlayer}
+        onClose={() => { setShowEditPlayer(false); setEditFormData(null) }}
+        formData={editFormData}
+        onSuccess={() => { fetchData(); setEditFormData(null); setShowEditPlayer(false) }}
+      />
+
       {/* Settings Modal */}
       <SettingsModal
         isOpen={showSettings}
@@ -559,8 +581,8 @@ const AddPlayerModal = ({ isOpen, onClose, onSuccess }) => {
               value={formData.base_price}
               onChange={(e) => setFormData({...formData, base_price: parseInt(e.target.value)})}
               className="input"
-              min={10000}
-              step={10000}
+              min={0}
+              step={1}
             />
           </div>
 
@@ -666,3 +688,115 @@ const SettingsModal = ({ isOpen, onClose, settings, onSave }) => {
 }
 
 export default AdminDashboard
+
+// Edit Player Modal Component
+const EditPlayerModal = ({ isOpen, onClose, formData, onSuccess }) => {
+  const [form, setForm] = useState(formData || null)
+  const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    setForm(formData)
+  }, [formData])
+
+  if (!isOpen || !form) return null
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    setLoading(true)
+    try {
+      // call API to update
+      await playersApi.update(form.id, {
+        name: form.name,
+        year: form.year,
+        position: form.position,
+        base_price: form.base_price,
+        played_last_year: form.played_last_year
+      })
+      toast.success('Player updated')
+      onSuccess()
+      onClose()
+    } catch (err) {
+      toast.error('Failed to update player')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg p-6 w-full max-w-md">
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">Edit Player</h2>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+            <input
+              type="text"
+              required
+              value={form.name}
+              onChange={(e) => setForm({...form, name: e.target.value})}
+              className="input"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Year</label>
+            <input
+              type="number"
+              required
+              value={form.year}
+              onChange={(e) => setForm({...form, year: parseInt(e.target.value) || form.year})}
+              className="input"
+              min={2020}
+              max={2030}
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Position</label>
+            <select
+              value={form.position}
+              onChange={(e) => setForm({...form, position: e.target.value})}
+              className="input"
+            >
+              <option value="GK">Goalkeeper</option>
+              <option value="Defender">Defender</option>
+              <option value="Midfield">Midfielder</option>
+              <option value="Striker">Striker</option>
+              <option value="Girls">Girls</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Base Price</label>
+            <input
+              type="number"
+              required
+              value={form.base_price}
+              onChange={(e) => setForm({...form, base_price: parseInt(e.target.value) || form.base_price})}
+              className="input"
+              min={0}
+              step={1}
+            />
+          </div>
+
+          <div className="flex items-center">
+            <input
+              type="checkbox"
+              id="edit_played_last_year"
+              checked={form.played_last_year}
+              onChange={(e) => setForm({...form, played_last_year: e.target.checked})}
+              className="mr-2"
+            />
+            <label htmlFor="edit_played_last_year" className="text-sm text-gray-700">Played last year</label>
+          </div>
+
+          <div className="flex space-x-3">
+            <button type="button" onClick={onClose} className="flex-1 btn btn-secondary">Cancel</button>
+            <button type="submit" disabled={loading} className="flex-1 btn-primary">{loading ? 'Saving...' : 'Save Changes'}</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}

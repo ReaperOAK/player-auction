@@ -4,7 +4,7 @@
 CREATE TABLE teams (
     id INTEGER PRIMARY KEY,
     name TEXT NOT NULL,
-    budget INTEGER NOT NULL DEFAULT 1000000,
+    budget INTEGER NOT NULL DEFAULT 1000,
     slots_left INTEGER NOT NULL DEFAULT 11,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
@@ -69,18 +69,18 @@ CREATE TRIGGER update_auction_state_updated_at BEFORE UPDATE ON auction_state
 -- Sample data insertion (optional)
 -- Insert sample teams
 INSERT INTO teams (id, name, budget, slots_left) VALUES
-(1, 'Team Alpha', 1000000, 11),
-(2, 'Team Beta', 1000000, 11),
-(3, 'Team Gamma', 1000000, 11),
-(4, 'Team Delta', 1000000, 11),
-(5, 'Team Echo', 1000000, 11),
-(6, 'Team Foxtrot', 1000000, 11),
-(7, 'Team Golf', 1000000, 11),
-(8, 'Team Hotel', 1000000, 11),
-(9, 'Team India', 1000000, 11),
-(10, 'Team Juliet', 1000000, 11),
-(11, 'Team Kilo (Girls)', 1000000, 11),
-(12, 'Team Lima (Girls)', 1000000, 11)
+(1, 'Team Alpha', 1000, 11),
+(2, 'Team Beta', 1000, 11),
+(3, 'Team Gamma', 1000, 11),
+(4, 'Team Delta', 1000, 11),
+(5, 'Team Echo', 1000, 11),
+(6, 'Team Foxtrot', 1000, 11),
+(7, 'Team Golf', 1000, 11),
+(8, 'Team Hotel', 1000, 11),
+(9, 'Team India', 1000, 11),
+(10, 'Team Juliet', 1000, 11),
+(11, 'Team Kilo (Girls)', 1000, 11),
+(12, 'Team Lima (Girls)', 1000, 11)
 ON CONFLICT (id) DO NOTHING;
 
 -- Sample players (you can add more via CSV upload)
