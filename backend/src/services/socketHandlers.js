@@ -2,14 +2,19 @@ const supabase = require('../config/database');
 
 let auctionTimer = null;
 let ioInstance = null; // Store io instance for external access
+let isStopping = false;
 
 // Helper to start the server-side timer (shared by start and resume)
 const startServerTimer = async (duration, io = ioInstance) => {
+  // If there's already a running timer, stop it first to avoid duplicates
   if (auctionTimer) {
-    clearInterval(auctionTimer);
+    isStopping = true;
+    clearTimeout(auctionTimer);
+    auctionTimer = null;
+    isStopping = false;
   }
 
-  let timeLeft = duration ?? 30;
+  let timeLeft = typeof duration === 'number' ? duration : 30;
 
   // Mark auction as in_progress in DB (best-effort)
   try {
@@ -21,32 +26,41 @@ const startServerTimer = async (duration, io = ioInstance) => {
     console.error('Failed to update auction state when starting timer:', err);
   }
 
-  // Immediately broadcast initial timer value
+  // Emit initial timer value immediately
   console.log(`⏰ Starting timer with ${timeLeft} seconds, broadcasting initial timer_update`);
   io?.emit('timer_update', { timeLeft });
 
-  auctionTimer = setInterval(async () => {
-    timeLeft--;
+  // Use recursive setTimeout to ensure each tick waits for async work to finish
+  const tick = async () => {
+    // If stop requested, do not schedule next tick
+    if (isStopping) return;
+
+    // Decrement
+    timeLeft = Math.max(0, timeLeft - 1);
 
     try {
-      // Update time in database
-      await supabase
+      // Atomically update DB time_left and fetch current state for broadcasting
+      const { data: updatedState, error } = await supabase
         .from('auction_state')
         .update({ time_left: timeLeft })
-        .eq('id', 1);
+        .eq('id', 1)
+        .select()
+        .single();
 
-      // Broadcast time update
-      io?.emit('timer_update', { timeLeft });
+      if (error) {
+        console.error('Error updating timer in DB:', error);
+      } else {
+        // Broadcast time update
+        io?.emit('timer_update', { timeLeft: timeLeft });
+      }
     } catch (err) {
-      console.error('Error updating timer in DB:', err);
+      console.error('Error during timer tick DB update:', err);
     }
 
-    // If time reaches 0, end auction
+    // If time reaches 0, perform auto-end logic and do not schedule another tick
     if (timeLeft <= 0) {
-      clearInterval(auctionTimer);
       auctionTimer = null;
 
-      // Auto-end auction logic
       try {
         const { data: currentState } = await supabase
           .from('auction_state')
@@ -54,7 +68,7 @@ const startServerTimer = async (duration, io = ioInstance) => {
           .eq('id', 1)
           .single();
 
-        if (currentState && currentState.current_bidder) {
+  if (currentState && currentState.current_bidder) {
           // Assign player to highest bidder
           await supabase
             .from('players')
@@ -90,7 +104,7 @@ const startServerTimer = async (duration, io = ioInstance) => {
             playerId: currentState.current_player_id,
             teamId: currentState.current_bidder,
             teamName: teamData?.name,
-            soldPrice: currentState.current_bid
+            soldPrice: Number(currentState.current_bid) || 0
           });
         } else {
           io?.emit('player_unsold', {
@@ -110,12 +124,42 @@ const startServerTimer = async (duration, io = ioInstance) => {
           })
           .eq('id', 1);
 
-        io?.emit('auction_auto_ended');
+        // Fetch the reset auction state to broadcast consistent state to clients
+        try {
+          const { data: resetState } = await supabase
+            .from('auction_state')
+            .select(`*
+            , current_player:players(
+                id,
+                name,
+                year,
+                position,
+                base_price,
+                played_last_year
+              )
+            `)
+            .eq('id', 1)
+            .single();
+
+          io?.emit('auction_auto_ended', { auctionState: resetState });
+          io?.emit('auction_state_update', { auctionState: resetState });
+        } catch (err) {
+          // Fall back to simple signal if fetching reset state fails
+          io?.emit('auction_auto_ended');
+        }
       } catch (error) {
         console.error('Auto-end auction error:', error);
       }
+
+      return;
     }
-  }, 1000);
+
+    // Schedule next tick after ~1s
+    auctionTimer = setTimeout(tick, 1000);
+  };
+
+  // Start first scheduled tick
+  auctionTimer = setTimeout(tick, 1000);
 };
 
 const socketHandlers = (io) => {
@@ -250,7 +294,9 @@ const socketHandlers = (io) => {
   // Cleanup on server shutdown
   process.on('SIGINT', () => {
     if (auctionTimer) {
-      clearInterval(auctionTimer);
+      isStopping = true;
+      clearTimeout(auctionTimer);
+      auctionTimer = null;
     }
   });
 };
@@ -261,8 +307,10 @@ module.exports = {
   startAuctionTimer: startServerTimer,
   stopAuctionTimer: () => {
     if (auctionTimer) {
-      clearInterval(auctionTimer);
+      isStopping = true;
+      clearTimeout(auctionTimer);
       auctionTimer = null;
+      isStopping = false;
       console.log('🛑 Auction timer stopped by external call');
     }
   }

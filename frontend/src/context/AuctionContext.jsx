@@ -146,10 +146,13 @@ export const AuctionProvider = ({ children }) => {
   }
 
   const handleAuctionEnded = (data) => {
-    dispatch({
-      type: 'SET_AUCTION_STATE',
-      payload: data.auctionState
-    })
+    // If payload includes auctionState, use it; otherwise refetch latest state
+    if (data && data.auctionState) {
+      dispatch({ type: 'SET_AUCTION_STATE', payload: data.auctionState })
+    } else {
+      // Best-effort: refresh from API to obtain canonical state
+      fetchAuctionState()
+    }
   }
 
   const handleAuctionStateUpdate = (data) => {
@@ -184,9 +187,18 @@ export const AuctionProvider = ({ children }) => {
   }
 
   const handlePlayerSold = (data) => {
+    // Normalize payload and ensure numeric soldPrice
+    const normalized = {
+      playerId: data?.playerId || data?.player_id || null,
+      teamId: data?.teamId || data?.team_id || null,
+      teamName: data?.teamName || data?.team_name || data?.team || 'Unknown',
+      soldPrice: Number(data?.soldPrice ?? data?.amount ?? data?.price) || 0
+    }
+
+    // Ensure UI state shows auction ended (not paused)
     dispatch({
       type: 'PLAYER_SOLD',
-      payload: data
+      payload: normalized
     })
     playSound('sold')
     createConfetti()
