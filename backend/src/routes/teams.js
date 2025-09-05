@@ -29,65 +29,8 @@ router.get('/', async (req, res) => {
   }
 });
 
-// Get single team with detailed info
-router.get('/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-    
-    const { data: team, error: teamError } = await supabase
-      .from('teams')
-      .select('*')
-      .eq('id', id)
-      .single();
-
-    if (teamError) {
-      throw teamError;
-    }
-
-    if (!team) {
-      return res.status(404).json({ error: 'Team not found' });
-    }
-
-    // Get team's players
-    const { data: players, error: playersError } = await supabase
-      .from('players')
-      .select('*')
-      .eq('sold_to', id)
-      .order('name');
-
-    if (playersError) {
-      throw playersError;
-    }
-
-    // Calculate stats
-    const totalSpent = players.reduce((sum, player) => sum + (player.sold_price || 0), 0);
-    const playersByPosition = {
-      GK: players.filter(p => p.position === 'GK').length,
-      Defender: players.filter(p => p.position === 'Defender').length,
-      Midfield: players.filter(p => p.position === 'Midfield').length,
-      Striker: players.filter(p => p.position === 'Striker').length,
-      Girls: players.filter(p => p.position === 'Girls').length
-    };
-
-    res.json({
-      success: true,
-      team: {
-        ...team,
-        players,
-        stats: {
-          totalSpent,
-          playersCount: players.length,
-          playersByPosition,
-          remainingBudget: team.budget - totalSpent,
-          slotsLeft: team.slots_left
-        }
-      }
-    });
-  } catch (error) {
-    console.error('Get team error:', error);
-    res.status(500).json({ error: 'Failed to fetch team' });
-  }
-});
+// NOTE: The dynamic `/:id` route is declared after specific routes like `/me/info` and `/leaderboard`
+// to avoid route collisions where Express would interpret 'leaderboard' as an id.
 
 // Get current user's team info
 router.get('/me/info', authenticateToken, async (req, res) => {
@@ -205,3 +148,63 @@ router.get('/leaderboard', async (req, res) => {
 });
 
 module.exports = router;
+
+// Get single team with detailed info (placed at file end to avoid route conflicts)
+router.get('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const { data: team, error: teamError } = await supabase
+      .from('teams')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (teamError) {
+      throw teamError;
+    }
+
+    if (!team) {
+      return res.status(404).json({ error: 'Team not found' });
+    }
+
+    // Get team's players
+    const { data: players, error: playersError } = await supabase
+      .from('players')
+      .select('*')
+      .eq('sold_to', id)
+      .order('name');
+
+    if (playersError) {
+      throw playersError;
+    }
+
+    // Calculate stats
+    const totalSpent = players.reduce((sum, player) => sum + (player.sold_price || 0), 0);
+    const playersByPosition = {
+      GK: players.filter(p => p.position === 'GK').length,
+      Defender: players.filter(p => p.position === 'Defender').length,
+      Midfield: players.filter(p => p.position === 'Midfield').length,
+      Striker: players.filter(p => p.position === 'Striker').length,
+      Girls: players.filter(p => p.position === 'Girls').length
+    };
+
+    res.json({
+      success: true,
+      team: {
+        ...team,
+        players,
+        stats: {
+          totalSpent,
+          playersCount: players.length,
+          playersByPosition,
+          remainingBudget: team.budget - totalSpent,
+          slotsLeft: team.slots_left
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Get team error:', error);
+    res.status(500).json({ error: 'Failed to fetch team' });
+  }
+});

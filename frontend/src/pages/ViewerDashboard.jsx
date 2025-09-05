@@ -22,8 +22,9 @@ const ViewerDashboard = () => {
   const [connectionStatus, setConnectionStatus] = useState('connecting')
 
   useEffect(() => {
-    // Connect as viewer if not already connected
-    socketService.connect(null)
+  // Ensure socket is connected (AuthProvider already connects on app load)
+  const conn = socketService.getConnectionStatus()
+  if (!conn.isConnected) socketService.connect(null)
     
     // Monitor connection status
     socketService.on('connect', () => setConnectionStatus('connected'))

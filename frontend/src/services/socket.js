@@ -15,8 +15,21 @@ class SocketService {
   }
 
   connect(user = null) {
-    if (this.socket) {
-      this.disconnect()
+    // If an active connected socket already exists, reuse it and re-join room if user provided
+    if (this.socket && this.socket.connected) {
+      if (user) {
+        try { this.socket.emit('join_room', { role: user.role, teamId: user.id }) } catch (err) { console.error('re-join room err', err) }
+      }
+      return this.socket
+    }
+
+    // If a socket exists but is not connected, try to reuse it by calling connect()
+    if (this.socket && !this.socket.connected) {
+      try {
+        this.socket.connect()
+      } catch (err) {
+        console.error('socket reconnect err', err)
+      }
     }
 
     this.socket = io(SOCKET_URL, {
