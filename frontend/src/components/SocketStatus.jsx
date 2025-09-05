@@ -28,13 +28,15 @@ const SocketStatus = () => {
   }
 
   return (
-    <div className="fixed top-4 right-4 z-50">
+    // outer wrapper should ignore pointer events so underlying UI (like navbar) remains clickable
+    <div className="fixed top-20 right-4 z-50 pointer-events-none">
       <div className={`
         flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium
         ${status.isConnected 
           ? 'bg-green-100 text-green-800 border border-green-200' 
           : 'bg-red-100 text-red-800 border border-red-200'
         }
+        pointer-events-auto /* make the toast itself interactive where needed */
       `}>
         {status.isConnected ? (
           <Wifi className="w-4 h-4" />
@@ -61,7 +63,7 @@ const SocketStatus = () => {
         {!status.isConnected && (
           <button
             onClick={handleReconnect}
-            className="ml-2 p-1 hover:bg-red-200 rounded"
+            className="ml-2 p-1 hover:bg-red-200 rounded pointer-events-auto"
             title="Force reconnect"
           >
             <RefreshCw className="w-3 h-3" />
