@@ -85,10 +85,10 @@ ON CONFLICT (id) DO NOTHING;
 
 -- Sample players (you can add more via CSV upload)
 INSERT INTO players (name, year, position, base_price, played_last_year) VALUES
-('John Smith', 2023, 'GK', 100000, true),
-('Mike Johnson', 2022, 'Defender', 80000, false),
-('Alex Brown', 2023, 'Midfield', 120000, true),
-('Chris Wilson', 2021, 'Striker', 150000, true),
-('Sarah Davis', 2023, 'Girls', 90000, false),
-('Emma Wilson', 2022, 'Girls', 85000, true)
+('John Smith', 2023, 'GK', 10, true),
+('Mike Johnson', 2022, 'Defender', 80, false),
+('Alex Brown', 2023, 'Midfield', 12, true),
+('Chris Wilson', 2021, 'Striker', 150, true),
+('Sarah Davis', 2023, 'Girls', 90, false),
+('Emma Wilson', 2022, 'Girls', 120, true)
 ON CONFLICT DO NOTHING;
